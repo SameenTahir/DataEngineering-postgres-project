@@ -9,16 +9,33 @@ from pyspark.sql.functions import udf
 
 
 def process_song_file(cur, filepath):
-    # open song file
-    df =  pd.read_json(filepath, lines=True)
-
-    # insert song record
-    song_data =  df[['song_id','title','artist_id','year','duration']].values.tolist()[0]
-    cur.execute(song_table_insert, song_data)
     
-    # insert artist record
-    artist_data = df[['artist_id', 'artist_name', 'artist_location', 'artist_latitude', 'artist_longitude']].values.tolist()[0]
-    cur.execute(artist_table_insert, artist_data)
+#open song file
+    df = pd.read_json(filepath, lines=True)
+    for index,row in df.iterrows():
+           #convert the Dataframe row into a dictonary
+        values = {}
+        for column in df.columns:
+                values[column] = row[column]
+
+
+        # insert artist record
+        artist_data = [values['artist_id'], 
+                        values['artist_name'], 
+                        values['artist_location'], 
+                        float(values['artist_longitude']), 
+                        float(values['artist_latitude'])]
+
+        cur.execute(artist_table_insert, artist_data)
+
+        # insert song record
+        song_data = [values['song_id'], 
+                    values['title'],
+                    values['artist_id'], 
+                    int(values['year']), 
+                    float(values['duration'])]
+
+        cur.execute(song_table_insert, song_data)
 
 
 def process_log_file(cur, filepath):
@@ -33,7 +50,7 @@ def process_log_file(cur, filepath):
     
     # insert time data records
     time_data = [t.dt.time, t.dt.hour, t.dt.day, t.dt.week,t.dt.month, t.dt.year, t.dt.dayofweek]
-    column_labels = [ 'start_time','hour','day', 'week', 'month', 'year', 'dayofweek']
+    column_labels = [ 'start_time','hour','day', 'week', 'month', 'year', 'weekday']
     time_df = pd.DataFrame(dict(zip(column_labels, time_data)))
 
     for i, row in time_df.iterrows():
@@ -54,12 +71,12 @@ def process_log_file(cur, filepath):
         results = cur.fetchone()
         
         if results:
-            songid, artistid = results
+            songid, artist_id = results
         else:
-            songid, artistid = None, None
+            songid, artist_id = None, None
 
         # insert songplay record
-        songplay_data =[row.ts, row.userId, row.level, songid, artistid, row.sessionId, row.location, row.userAgent]
+        songplay_data =[row.ts, row.userId, row.level, songid, artist_id, row.sessionId, row.location, row.userAgent]
     cur.execute(songplay_table_insert, songplay_data)
 
 
